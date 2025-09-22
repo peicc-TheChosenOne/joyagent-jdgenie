@@ -19,24 +19,28 @@ import java.util.*;
 @Component
 public class ReactHandlerImpl implements AgentHandlerService {
 
+    // ReAct 单智能体处理模式
+
     @Autowired
     private GenieConfig genieConfig;
 
-
     @Override
     public String handle(AgentContext agentContext, AgentRequest request) {
-
+        // 1) 创建执行Agent与汇总Agent
         ReActAgent executor = new ReactImplAgent(agentContext);
         SummaryAgent summary = new SummaryAgent(agentContext);
         summary.setSystemPrompt(summary.getSystemPrompt().replace("{{query}}", request.getQuery()));
 
+        // 2) 执行ReAct主循环（思考-行动-观察）
         executor.run(request.getQuery());
+        // 3) 执行完成后做结果汇总，抽取最终答案与文件
         TaskSummaryResult result = summary.summaryTaskResult(executor.getMemory().getMessages(), request.getQuery());
 
         Map<String, Object> taskResult = new HashMap<>();
         taskResult.put("taskSummary", result.getTaskSummary());
 
         if (CollectionUtils.isEmpty(result.getFiles())) {
+            // 若汇总未返回文件，则回退到上下文收集的产出文件（过滤中间产物）
             if (!CollectionUtils.isEmpty(agentContext.getProductFiles())) {
                 List<File> fileResponses = agentContext.getProductFiles();
                 // 过滤中间搜索结果文件
@@ -48,6 +52,7 @@ public class ReactHandlerImpl implements AgentHandlerService {
             taskResult.put("fileList", result.getFiles());
         }
 
+        // 4) SSE 输出最终结果
         agentContext.getPrinter().send("result", taskResult);
 
         return "";

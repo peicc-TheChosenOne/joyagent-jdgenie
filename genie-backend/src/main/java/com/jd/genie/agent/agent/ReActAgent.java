@@ -15,7 +15,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * ReAct代理 - 基于ReAct模式的智能代理
+ * ReAct代理 - 基于 ReAct (Reasoning + Acting) 模式
+ * - 抽象出 think() / act() 两阶段
+ * - step() 内部串接：先思考是否需要行动，再行动
  */
 @Data
 @Slf4j
@@ -23,17 +25,17 @@ import java.util.regex.Pattern;
 public abstract class ReActAgent extends BaseAgent {
 
     /**
-     * 思考过程
+     * 思考阶段：返回 true 表示需要执行 act()
      */
     public abstract boolean think();
 
     /**
-     * 执行行动
+     * 行动阶段：执行工具调用/生成回答
      */
     public abstract String act();
 
     /**
-     * 执行单个步骤
+     * 单步执行：先 think 再 act
      */
     @Override
     public String step() {

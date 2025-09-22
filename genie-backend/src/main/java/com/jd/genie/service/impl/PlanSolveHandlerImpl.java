@@ -33,40 +33,67 @@ public class PlanSolveHandlerImpl implements AgentHandlerService {
 
     @Override
     public String handle(AgentContext agentContext, AgentRequest request) {
-
+        // Plan + Execute 模式：先规划后执行，可并行执行多个子任务
+        // 构建计划智能体
         PlanningAgent planning = new PlanningAgent(agentContext);
+
+        // 构建执行器智能体
         ExecutorAgent executor = new ExecutorAgent(agentContext);
+
+        // 构建通用总结智能体
         SummaryAgent summary = new SummaryAgent(agentContext);
         summary.setSystemPrompt(summary.getSystemPrompt().replace("{{query}}", request.getQuery()));
 
+        // 计划智能体 初次规划
         String planningResult = planning.run(agentContext.getQuery());
+
+        // 迭代索引
         int stepIdx = 0;
+        // 最大迭代次数
         int maxStepNum = genieConfig.getPlannerMaxSteps();
+
+        // 不断循环直到最大次数
         while (stepIdx <= maxStepNum) {
+            // 将规划结果拆解成可执行任务列表
             List<String> planningResults = Arrays.stream(planningResult.split("<sep>"))
                     .map(task -> "你的任务是：" + task)
-                    .collect(Collectors.toList());
+                    .toList();
             String executorResult;
+
+            // 执行前清除任务文件
             agentContext.getTaskProductFiles().clear();
+
+             // 单任务串行执行
             if (planningResults.size() == 1) {
+                log.info("单任务------");
                 executorResult = executor.run(planningResults.get(0));
             } else {
+                log.info("多任务------");
+                // 多任务并行执行：每个子任务复制当前记忆，执行完毕合并回主执行器
                 Map<String, String> tmpTaskResult = new ConcurrentHashMap<>();
+                // 定义线程计数器
                 CountDownLatch taskCount = ThreadUtil.getCountDownLatch(planningResults.size());
+                // 记忆 条数
                 int memoryIndex = executor.getMemory().size();
+                // 创建从执行器副本，每个任务独立执行
                 List<ExecutorAgent> slaveExecutors = new ArrayList<>();
                 for (String task : planningResults) {
                     ExecutorAgent slaveExecutor = new ExecutorAgent(agentContext);
                     slaveExecutor.setState(executor.getState());
-                    slaveExecutor.getMemory().addMessages(executor.getMemory().getMessages());
+                    slaveExecutor.getMemory().addMessages(executor.getMemory().getMessages()); // 复制记忆
                     slaveExecutors.add(slaveExecutor);
+
+                    // 并行执行每个任务
                     ThreadUtil.execute(() -> {
                         String taskResult = slaveExecutor.run(task);
                         tmpTaskResult.put(task, taskResult);
                         taskCount.countDown();
                     });
                 }
+                // 等待所有任务完成
                 ThreadUtil.await(taskCount);
+
+                // 合并从执行器的记忆到主执行器
                 for (ExecutorAgent slaveExecutor : slaveExecutors) {
                     for (int i = memoryIndex; i < slaveExecutor.getMemory().size(); i++) {
                         executor.getMemory().addMessage(slaveExecutor.getMemory().get(i));
@@ -76,7 +103,9 @@ public class PlanSolveHandlerImpl implements AgentHandlerService {
                 }
                 executorResult = String.join("\n", tmpTaskResult.values());
             }
+            // 基于执行结果继续迭代规划
             planningResult = planning.run(executorResult);
+
             if ("finish".equals(planningResult)) {
                 //任务成功结束，总结任务
                 TaskSummaryResult result = summary.summaryTaskResult(executor.getMemory().getMessages(), request.getQuery());
@@ -96,7 +125,7 @@ public class PlanSolveHandlerImpl implements AgentHandlerService {
                     taskResult.put("fileList", result.getFiles());
                 }
 
-                agentContext.getPrinter().send("result", taskResult);
+                agentContext.getPrinter().send("result", taskResult); // 输出最终结果
 
 
                 break;

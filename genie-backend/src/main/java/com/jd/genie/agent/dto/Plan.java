@@ -17,25 +17,16 @@ import java.util.List;
 @AllArgsConstructor
 public class Plan {
 
-    /**
-     * 计划标题
-     */
-    private String title;
+    private String title;           // 计划标题
+    private List<String> steps;     // 计划步骤列表
 
-    /**
-     * 计划步骤列表
-     */
-    private List<String> steps;
-
-    /**
-     * 步骤状态列表
-     */
-    private List<String> stepStatus;
-
-    /**
-     * 步骤备注列表
-     */
-    private List<String> notes;
+    // 步骤状态枚举值
+    // "not_started"  // 未开始
+    // "in_progress"  // 进行中
+    // "completed"   // 已完成
+    // "blocked"     // 被阻塞
+    private List<String> stepStatus;// 步骤状态列表
+    private List<String> notes;     // 步骤备注列表
 
     /**
      * 创建新计划
@@ -44,9 +35,10 @@ public class Plan {
         List<String> status = new ArrayList<>();
         List<String> notes = new ArrayList<>();
 
+        // 为每个步骤初始化状态和备注
         for (int i = 0; i < steps.size(); i++) {
-            status.add("not_started");
-            notes.add("");
+            status.add("not_started");  // 初始状态：未开始
+            notes.add("");             // 初始备注：空
         }
 
         return Plan.builder()
@@ -70,6 +62,7 @@ public class Plan {
             List<String> newNotes = new ArrayList<>();
 
             for (int i = 0; i < newSteps.size(); i++) {
+                // 智能状态保持：相同步骤保持原有状态，新步骤重置
                 if (i < this.steps.size() && newSteps.get(i).equals(this.steps.get(i))) {
                     // 保持原有状态和备注
                     newStatuses.add(this.stepStatus.get(i));
@@ -118,20 +111,23 @@ public class Plan {
 
     /**
      * 更新当前task为 completed，下一个task为 in_progress
+     *
      */
     public void stepPlan() {
         if (steps.isEmpty()) {
             return;
         }
+        // 如果没有正在进行的任务，开始第一个任务
         if (getCurrentStep().isEmpty()) {
             updateStepStatus(0, "in_progress", "");
             return;
         }
+        // 完成当前任务，开始下一个任务
         for (int i = 0; i < steps.size(); i++) {
             if ("in_progress".equals(stepStatus.get(i))) {
-                updateStepStatus(i, "completed", "");
+                updateStepStatus(i, "completed", ""); // 当前完成
                 if (i + 1 < steps.size()) {
-                    updateStepStatus(i + 1, "in_progress", "");
+                    updateStepStatus(i + 1, "in_progress", "");  // 下一个开始
                     break;
                 }
             }

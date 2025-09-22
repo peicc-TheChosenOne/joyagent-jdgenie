@@ -22,56 +22,65 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * 代理基类 - 管理代理状态和执行的基础类
+ * 代理基类
+ * - 统一管理：名称、描述、提示词、可用工具、记忆、LLM、上下文、状态与步数
+ * - 提供 run(step循环) 与 updateMemory 等核心能力
  */
 @Slf4j
 @Data
 @Accessors(chain = true)
 public abstract class BaseAgent {
 
-    // 核心属性
-    private String name;
-    private String description;
-    private String systemPrompt;
-    private String nextStepPrompt;
-    public ToolCollection availableTools = new ToolCollection();
-    private Memory memory = new Memory();
-    protected LLM llm;
-    protected AgentContext context;
+    // 基本信息
+    private String name;                    // 智能体名称
+    private String description;             // 智能体描述
+    private String systemPrompt;            // 系统提示词
+    private String nextStepPrompt;          // 下一步提示词
+
+    // 核心组件
+    public ToolCollection availableTools = new ToolCollection();   // 可用工具集合
+    private Memory memory = new Memory();   // 对话记忆
+    protected LLM llm;                      // 大语言模型
+    protected AgentContext context;         // 执行上下文
 
     // 执行控制
-    private AgentState state = AgentState.IDLE;
-    private int maxSteps = 10;
-    private int currentStep = 0;
+    private AgentState state = AgentState.IDLE;  // 当前状态
+    private int maxSteps = 10;                   // 最大执行步数
+    private int currentStep = 0;                // 当前步数
     private int duplicateThreshold = 2;
 
-    // emitter
-    Printer printer;
+    // 输出组件
+    Printer printer;                        // 输出器(SSE等)
 
-    // digital employee prompt
+    // 数字员工命名提示词
     private String digitalEmployeePrompt;
 
+
     /**
-     * 执行单个步骤
+     * 执行单个步骤（由子类实现具体逻辑）
      */
     public abstract String step();
 
+
     /**
-     * 运行代理主循环
+     * 模板方法模式
+     * 主循环：按步执行，直到达到最大步数或状态变为 FINISHED
      */
     public String run(String query) {
+        // 初始化状态
         setState(AgentState.IDLE);
 
+        // 添加用户查询到记忆
         if (!query.isEmpty()) {
             updateMemory(RoleType.USER, query, null);
         }
-
+        // 执行循环
         List<String> results = new ArrayList<>();
         try {
             while (currentStep < maxSteps && state != AgentState.FINISHED) {
                 currentStep++;
                 log.info("{} {} Executing step {}/{}", context.getRequestId(), getName(), currentStep, maxSteps);
-                String stepResult = step();
+                String stepResult = step();  // 调用子类的具体实现
                 results.add(stepResult);
             }
 
@@ -81,7 +90,7 @@ public abstract class BaseAgent {
                 results.add("Terminated: Reached max steps (" + maxSteps + ")");
             }
         } catch (Exception e) {
-            state = AgentState.ERROR;
+            state = AgentState.ERROR; // 将异常透出给上层流程
             throw e;
         }
 
@@ -89,7 +98,7 @@ public abstract class BaseAgent {
     }
 
     /**
-     * 更新代理记忆
+     * 更新代理记忆：按角色追加一条消息（支持图像）
      */
     public void updateMemory(RoleType role, String content, String base64Image, Object... args) {
         Message message;
@@ -112,6 +121,7 @@ public abstract class BaseAgent {
         memory.addMessage(message);
     }
 
+    // 工具执行
     public String executeTool(ToolCall command) {
         if (command == null || command.getFunction() == null || command.getFunction().getName() == null) {
             return "Error: Invalid function call format";

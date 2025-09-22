@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # =====================
-#
-#
+# 工具API路由 - 提供代码解释器、报告生成、深度搜索等接口
 # Author: liumin.423
 # Date:   2025/7/7
 # =====================
@@ -20,20 +19,21 @@ from genie_tool.tool.code_interpreter import code_interpreter_agent
 from genie_tool.util.middleware_util import RequestHandlerRoute
 from genie_tool.tool.deepsearch import DeepSearch
 
+# 创建路由器实例，使用自定义路由处理
 router = APIRouter(route_class=RequestHandlerRoute)
 
 
 @router.post("/code_interpreter")
-async def post_code_interpreter(
-    body: CIRequest,
-):
-     # 处理文件路径
+async def post_code_interpreter(body: CIRequest):
+    """代码解释器接口 - 执行Python代码并返回结果"""
+    # 处理文件路径 - 相对路径添加文件服务器前缀
     if body.file_names:
         for idx, f_name in enumerate(body.file_names):
             if not f_name.startswith("/") and not f_name.startswith("http"):
                 body.file_names[idx] = f"{os.getenv('FILE_SERVER_URL')}/preview/{body.request_id}/{f_name}"
 
     async def _stream():
+        """流式响应生成器"""
         acc_content = ""
         acc_token = 0
         acc_time = time.time()

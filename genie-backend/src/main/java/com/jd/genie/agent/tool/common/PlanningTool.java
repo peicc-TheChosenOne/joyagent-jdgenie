@@ -18,6 +18,7 @@ import java.util.function.Function;
 public class PlanningTool implements BaseTool {
 
     private AgentContext agentContext;
+    // 命令处理器映射
     private final Map<String, Function<Map<String, Object>, String>> commandHandlers = new HashMap<>();
     private Plan plan;
 
@@ -46,7 +47,6 @@ public class PlanningTool implements BaseTool {
         if (!genieConfig.getPlanToolParams().isEmpty()) {
             return genieConfig.getPlanToolParams();
         }
-
         return getParameters();
     }
 
@@ -104,6 +104,11 @@ public class PlanningTool implements BaseTool {
     private Map<String, Object> getStepStatusProperty() {
         Map<String, Object> stepStatus = new HashMap<>();
         stepStatus.put("type", "string");
+        // 步骤状态枚举值
+        // "not_started"  // 未开始
+        // "in_progress"  // 进行中
+        // "completed"   // 已完成
+        // "blocked"     // 被阻塞
         stepStatus.put("enum", Arrays.asList("not_started", "in_progress", "completed", "blocked"));
         stepStatus.put("description", "Status to set for a step. Used with mark_step command.");
         return stepStatus;
@@ -116,6 +121,18 @@ public class PlanningTool implements BaseTool {
         return stepNotes;
     }
 
+
+    /*
+      {
+         command=create,
+         title=OpenAI模型价格查询分析,
+         steps=[
+            执行顺序1. 模型信息收集：获取OpenAI当前所有可用模型的列表和基本信息,
+            执行顺序2. 价格数据获取：查询每个模型的详细定价信息，包括输入输出token价格,
+            执行顺序3. 数据整理分析：将收集到的模型和价格信息整理成结构化数据,
+            执行顺序4. 输出报告：以网页形式呈现OpenAI模型价格分析报告]
+       }
+     */
     @Override
     public Object execute(Object input) {
         if (!(input instanceof Map)) {

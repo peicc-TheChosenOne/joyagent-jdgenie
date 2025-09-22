@@ -13,6 +13,7 @@ import java.util.Objects;
  */
 @Data
 public class Memory {
+    // 对话历史
     private List<Message> messages = new ArrayList<>();
 
     /**

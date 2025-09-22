@@ -1,0 +1,6 @@
+# Ignore local Conda directories anywhere in the repo
+.conda/
+
+
+genie-tool/file_db_dir/*
+genie-tool/autobots.db

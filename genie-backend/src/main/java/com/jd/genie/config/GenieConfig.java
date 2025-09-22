@@ -18,6 +18,7 @@ import java.util.Map;
 @Configuration
 public class GenieConfig {
 
+    // 规划/执行/React 各阶段提示词模板（key: profile，如 default）
     private Map<String, String> plannerSystemPromptMap = new HashMap<>();
     @Value("${autobots.autoagent.planner.system_prompt:{}}")
     public void setPlannerSystemPromptMap(String list) {
@@ -94,7 +95,7 @@ public class GenieConfig {
     /**
      * planTool 配置
      */
-    private Map<String, Object> planToolParams = new HashMap<>();
+    private Map<String, Object> planToolParams = new HashMap<>(); // plan 工具参数 JSON
     @Value("${autobots.autoagent.tool.plan_tool.params:{}}")
     public void setPlanToolParams(String jsonStr) {
         this.planToolParams = JSON.parseObject(jsonStr, Map.class);
@@ -103,7 +104,7 @@ public class GenieConfig {
     /**
      * codeAgent 配置
      */
-    private Map<String, Object> codeAgentPamras = new HashMap<>();
+    private Map<String, Object> codeAgentPamras = new HashMap<>(); // code-interpreter 工具参数 JSON
     @Value("${autobots.autoagent.tool.code_agent.params:{}}")
     public void setCodeAgentPamras(String jsonStr) {
         this.codeAgentPamras = JSON.parseObject(jsonStr, Map.class);
@@ -112,7 +113,7 @@ public class GenieConfig {
     /**
      * reportTool 配置
      */
-    private Map<String, Object> reportToolPamras = new HashMap<>();
+    private Map<String, Object> reportToolPamras = new HashMap<>(); // 报告工具参数 JSON
     @Value("${autobots.autoagent.tool.report_tool.params:{}}")
     public void setHtmlToolPamras(String jsonStr) {
         this.reportToolPamras = JSON.parseObject(jsonStr, Map.class);
@@ -121,7 +122,7 @@ public class GenieConfig {
     /**
      * fileTool 配置
      */
-    private Map<String, Object> fileToolPamras = new HashMap<>();
+    private Map<String, Object> fileToolPamras = new HashMap<>(); // 文件工具参数 JSON
     @Value("${autobots.autoagent.tool.file_tool.params:{}}")
     public void setFileoolPamras(String jsonStr) {
         this.fileToolPamras = JSON.parseObject(jsonStr, Map.class);
@@ -130,7 +131,7 @@ public class GenieConfig {
     /**
      * DeepSearchTool 配置
      */
-    private Map<String, Object> deepSearchToolPamras = new HashMap<>();
+    private Map<String, Object> deepSearchToolPamras = new HashMap<>(); // 深度搜索工具参数 JSON
     @Value("${autobots.autoagent.tool.deep_search.params:{}}")
     public void setDeepSearchToolPamras(String jsonStr) {
         this.deepSearchToolPamras = JSON.parseObject(jsonStr, Map.class);
@@ -160,7 +161,7 @@ public class GenieConfig {
     @Value("${autobots.autoagent.deep_search_page_count:5}")
     private String deepSearchPageCount;
 
-    private Map<String, String> multiAgentToolListMap = new HashMap<>();
+    private Map<String, String> multiAgentToolListMap = new HashMap<>(); // 默认工具清单（profile->逗号分隔列表）
     @Value("${autobots.autoagent.tool_list:{}}")
     public void setMultiAgentToolList(String list) {
         multiAgentToolListMap = JSONObject.parseObject(list, new TypeReference<Map<String, String>>() {
@@ -170,7 +171,7 @@ public class GenieConfig {
     /**
      * LLM Settings
      */
-    private Map<String, LLMSettings> llmSettingsMap;
+    private Map<String, LLMSettings> llmSettingsMap; // 每个模型的细粒度限额/URL等设置
     @Value("${llm.settings:{}}")
     public void setLLMSettingsMap(String jsonStr) {
         this.llmSettingsMap = JSON.parseObject(jsonStr, new TypeReference<Map<String, LLMSettings>>() {
@@ -190,16 +191,16 @@ public class GenieConfig {
     private String maxObserve;
 
     @Value("${autobots.autoagent.code_interpreter_url:}")
-    private String CodeInterpreterUrl;
+    private String CodeInterpreterUrl; // Python 代码执行工具服务地址
 
     @Value("${autobots.autoagent.deep_search_url:}")
-    private String DeepSearchUrl;
+    private String DeepSearchUrl; // 深度搜索工具服务地址
 
     @Value("${autobots.autoagent.mcp_client_url:}")
-    private String mcpClientUrl;
+    private String mcpClientUrl; // MCP 客户端服务地址
 
     @Value("${autobots.autoagent.mcp_server_url:}")
-    private String[] mcpServerUrlArr;
+    private String[] mcpServerUrlArr; // MCP 工具服务器列表（逗号分隔）
 
     @Value("${autobots.autoagent.summary.system_prompt:}")
     private String summarySystemPrompt;
@@ -210,21 +211,21 @@ public class GenieConfig {
     @Value("${autobots.autoagent.summary.message_size_limit:1000}")
     private Integer messageSizeLimit;
 
-    private Map<String, String> sensitivePatterns = new HashMap<>();
+    private Map<String, String> sensitivePatterns = new HashMap<>(); // 敏感词/模式配置
     @Value("${autobots.autoagent.sensitive_patterns:{}}")
     public void setSensitivePatterns(String jsonStr) {
         this.sensitivePatterns = JSON.parseObject(jsonStr, new TypeReference<Map<String, String>>() {
         });
     }
 
-    private Map<String, String> outputStylePrompts = new HashMap<>();
+    private Map<String, String> outputStylePrompts = new HashMap<>(); // 输出样式提示词片段（html/docs/table/ppt）
     @Value("${autobots.autoagent.output_style_prompts:{}}")
     public void setOutputStylePrompts(String jsonStr) {
         this.outputStylePrompts = JSON.parseObject(jsonStr, new TypeReference<Map<String, String>>() {
         });
     }
 
-    private Map<String, String> messageInterval = new HashMap<>();
+    private Map<String, String> messageInterval = new HashMap<>(); // SSE 事件之间的节流控制
     @Value("${autobots.autoagent.message_interval:{}}")
     public void setMessageInterval(String jsonStr) {
         this.messageInterval = JSON.parseObject(jsonStr, new TypeReference<Map<String, String>>() {

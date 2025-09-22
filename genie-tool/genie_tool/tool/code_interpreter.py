@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # =====================
-#
-#
+# 代码解释器工具 - 执行Python代码并提供分析结果
 # Author: liumin.423
 # Date:   2025/7/7
 # =====================
@@ -33,25 +32,28 @@ async def code_interpreter_agent(
     request_id: str = "",
     stream: bool = True,
 ):
+    """代码解释器主函数 - 执行Python代码分析任务"""
     work_dir = ""
     try:
+        # 创建临时工作目录
         work_dir = tempfile.mkdtemp()
         output_dir = os.path.join(work_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
+        
+        # 下载输入文件到工作目录
         import_files = await download_all_files_in_path(file_names=file_names, work_dir=work_dir)
 
-        # 1. 文件处理
+        # 处理输入文件 - 提取摘要信息
         files = []
         if import_files:
             for import_file in import_files:
 
                 file_name = import_file["file_name"]
-
                 file_path = import_file["file_path"]
                 if not file_name or not file_path:
                     continue
 
-                # 表格文件
+                # 表格文件 - 提取前10行数据
                 if file_name.split(".")[-1] in ["xlsx", "xls", "csv"]:
                     pd.set_option("display.max_columns", None)
                     df = (
@@ -60,22 +62,19 @@ async def code_interpreter_agent(
                         else pd.read_excel(file_path)
                     )
                     files.append({"path": file_path, "abstract": f"{df.head(10)}"})
-                # 文本文件
+                
+                # 文本文件 - 提取前N个字符
                 elif file_name.split(".")[-1] in ["txt", "md", "html"]:
                     with open(file_path, "r") as rf:
-                        files.append(
-                            {
-                                "path": file_path,
-                                "abstract": "".join(rf.readlines())[
-                                    :max_file_abstract_size
-                                ],
-                            }
-                        )
+                        files.append({
+                            "path": file_path,
+                            "abstract": "".join(rf.readlines())[:max_file_abstract_size],
+                        })
 
-        # 2. 构建 Prompt
+        # 构建Prompt模板
         ci_prompt_template = get_prompt("code_interpreter")
 
-        # 3. CodeAgent
+        # 创建代码智能体
         agent = create_ci_agent(
             prompt_templates=ci_prompt_template,
             max_tokens=max_tokens,

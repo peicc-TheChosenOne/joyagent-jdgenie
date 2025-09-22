@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # =====================
-# 
-# 
+# 报告生成工具 - 支持多种格式的智能报告生成
 # Author: liumin.423
 # Date:   2025/7/7
 # =====================
@@ -29,12 +28,13 @@ async def report(
         model: str = "gpt-4.1",
         file_type: Literal["markdown", "html", "ppt"] = "markdown",
 ) -> AsyncGenerator:
+    """报告生成主函数 - 根据文件类型路由到对应生成器"""
     report_factory = {
         "ppt": ppt_report,
         "markdown": markdown_report,
         "html": html_report,
     }
-    model = os.getenv("REPORT_MODEL", "gpt-4.1")
+    model = os.getenv("REPORT_MODEL", "gpt-4.1")  # 从环境变量获取模型配置
     async for chunk in report_factory[file_type](task, file_names, model):
         yield chunk
 
@@ -50,11 +50,11 @@ async def ppt_report(
     files = await download_all_files(file_names)
     flat_files = []
 
-    # 1. 首先解析 md html 文件，没有这部分文件则使用全部
+    # 优先处理 md/html 文件，否则使用全部文件
     filtered_files = [f for f in files if f["file_name"].split(".")[-1] in ["md", "html"]
                       and not f["file_name"].endswith("_搜索结果.md")] or files
     for f in filtered_files:
-        # 对于搜索文件有结构，需要重新解析
+        # 搜索文件需要特殊解析
         if f["file_name"].endswith("_search_result.txt"):
             flat_files.extend(flatten_search_file(f))
         else:

@@ -14,15 +14,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EventResult {
-    /**
-     * 增量消息计数
-     */
+    /** 增量消息计数 */
     private AtomicInteger messageCount = new AtomicInteger(0);
 
-    /**
-     * 增量消息偏移量（从 1 开始）
-     */
-    private Map<String, Integer> orderMapping = new HashMap<>();
+    /** 增量消息偏移量（从1开始） */
+    private Map<String, Integer> orderMapping = new HashMap<>(); // key: messageType, value: 序号
 
     public Integer getAndIncrOrder(String key) {
         Integer order = orderMapping.get(key);
@@ -34,9 +30,7 @@ public class EventResult {
         return order + 1;
     }
 
-    /**
-     * 增量计划-初始化标识
-     */
+    /** 增量计划初始化标识 */
     public Boolean initPlan;
 
     public Boolean isInitPlan() {
@@ -47,11 +41,9 @@ public class EventResult {
         return false;
     }
 
-    /**
-     * 增量任务
-     */
-    private String taskId;
-    private AtomicInteger taskOrder = new AtomicInteger(1);
+    /** 增量任务标识与序号 */
+    private String taskId; // 当前任务ID
+    private AtomicInteger taskOrder = new AtomicInteger(1); // 当前任务内的序号
 
     public String getTaskId() {
         if (Objects.isNull(this.taskId) || this.taskId.isEmpty()) {
@@ -66,20 +58,18 @@ public class EventResult {
         return this.taskId;
     }
 
-    /**
-     * 增量任务-流式消息类型
-     */
-    private List<String> streamTaskMessageType = new ArrayList<String>() {{
-        add("html");
-        add("markdown");
-        add("deep_search");
-        add("tool_thought");
-    }};
+    /** 流式消息类型白名单（用于直出SSE） */
+    private List<String> streamTaskMessageType = new ArrayList<String>() {
+        { // 流式直出类型
+            add("html");
+            add("markdown");
+            add("deep_search");
+            add("tool_thought");
+        }
+    };
 
-    /**
-     * 全量结果（回放）
-     */
-    private Map<String, Object> resultMap = new HashMap<>();
+    /** 全量结果（回放） */
+    private Map<String, Object> resultMap = new HashMap<>(); // 用于回放/重试时的聚合
 
     public List<Object> getResulMapTask() {
         if (this.resultMap.containsKey("tasks")) {
@@ -92,9 +82,11 @@ public class EventResult {
     public void setResultMapTask(List<Object> task) {
         List<Object> tasks = this.getResulMapTask();
         if (Objects.isNull(tasks)) {
-            tasks = new ArrayList<Object>() {{
-                add(task);
-            }};
+            tasks = new ArrayList<Object>() {
+                {
+                    add(task);
+                }
+            };
             this.resultMap.put("tasks", tasks);
             return;
         }
@@ -104,18 +96,18 @@ public class EventResult {
     public void setResultMapSubTask(Object subTask) {
         List<Object> tasks = this.getResulMapTask();
         if (Objects.isNull(tasks)) {
-            tasks = new ArrayList<Object>() {{
-                add(new ArrayList<>());
-            }};
+            tasks = new ArrayList<Object>() {
+                {
+                    add(new ArrayList<>());
+                }
+            };
             this.resultMap.put("tasks", tasks);
         }
         List<Object> subTasks = (List<Object>) tasks.get(tasks.size() - 1);
         subTasks.add(subTask);
     }
 
-    /**
-     * 全量结果（重连）
-     */
+    /** 全量结果列表（重连） */
     private List<Object> resultList = new ArrayList<>();
 
     public static void main(String[] args) {
@@ -124,13 +116,17 @@ public class EventResult {
         res.setResultMapTask(task);
         List<Object> subTask = new ArrayList<Object>();
         res.setResultMapSubTask(subTask);
-        List<Object> task1 = new ArrayList<Object>() {{
-            add("task1");
-        }};
+        List<Object> task1 = new ArrayList<Object>() {
+            {
+                add("task1");
+            }
+        };
         res.setResultMapTask(task1);
-        List<Object> task2 = new ArrayList<Object>() {{
-            add("task2");
-        }};
+        List<Object> task2 = new ArrayList<Object>() {
+            {
+                add("task2");
+            }
+        };
         res.setResultMapTask(task2);
         List<Object> subTask2 = new ArrayList<Object>();
         res.setResultMapSubTask(subTask2);

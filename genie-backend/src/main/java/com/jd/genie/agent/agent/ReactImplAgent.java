@@ -22,17 +22,20 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 工具调用代理 - 处理工具/函数调用的基础代理类
+ * ReAct 实现代理
+ * - 以 ReAct 思考-行动-观察循环驱动工具调用
+ * - 根据 react 提示词模板构造 system/next_step
+ * - 支持流式输出和工具调用
  */
 @Data
 @Slf4j
 @EqualsAndHashCode(callSuper = true)
 public class ReactImplAgent extends ReActAgent {
 
-    private List<ToolCall> toolCalls;
-    private Integer maxObserve;
-    private String systemPromptSnapshot;
-    private String nextStepPromptSnapshot;
+    private List<ToolCall> toolCalls; // 当前步骤的工具调用列表
+    private Integer maxObserve; // 观察结果的最大长度限制
+    private String systemPromptSnapshot; // 系统提示词快照
+    private String nextStepPromptSnapshot; // 下一步提示词快照
 
     public ReactImplAgent(AgentContext context) {
         setName("react");
@@ -40,11 +43,13 @@ public class ReactImplAgent extends ReActAgent {
         ApplicationContext applicationContext = SpringContextHolder.getApplicationContext();
         GenieConfig genieConfig = applicationContext.getBean(GenieConfig.class);
 
+        // 构建工具描述字符串
         StringBuilder toolPrompt = new StringBuilder();
         for (BaseTool tool : context.getToolCollection().getToolMap().values()) {
             toolPrompt.append(String.format("工具名：%s 工具描述：%s\n", tool.getName(), tool.getDescription()));
         }
 
+        // 构造系统提示词和下一步提示词
         String promptKey = "default";
         String nextPromptKey = "default";
 
@@ -53,15 +58,18 @@ public class ReactImplAgent extends ReActAgent {
                 .replace("{{query}}", context.getQuery())
                 .replace("{{date}}", context.getDateInfo())
                 .replace("{{basePrompt}}", context.getBasePrompt()));
-        setNextStepPrompt(genieConfig.getReactNextStepPromptMap().getOrDefault(nextPromptKey, ToolCallPrompt.NEXT_STEP_PROMPT)
-                .replace("{{tools}}", toolPrompt.toString())
-                .replace("{{query}}", context.getQuery())
-                .replace("{{date}}", context.getDateInfo())
-                .replace("{{basePrompt}}", context.getBasePrompt()));
+        setNextStepPrompt(
+                genieConfig.getReactNextStepPromptMap().getOrDefault(nextPromptKey, ToolCallPrompt.NEXT_STEP_PROMPT)
+                        .replace("{{tools}}", toolPrompt.toString())
+                        .replace("{{query}}", context.getQuery())
+                        .replace("{{date}}", context.getDateInfo())
+                        .replace("{{basePrompt}}", context.getBasePrompt()));
 
+        // 保存提示词快照，用于后续动态更新
         setSystemPromptSnapshot(getSystemPrompt());
         setNextStepPromptSnapshot(getNextStepPrompt());
 
+        // 初始化智能体配置
         setPrinter(context.printer);
         setMaxSteps(genieConfig.getReactMaxSteps());
         setLlm(new LLM(genieConfig.getReactModelName(), ""));
@@ -74,41 +82,43 @@ public class ReactImplAgent extends ReActAgent {
 
     @Override
     public boolean think() {
-        // 获取文件内容
+        // 获取文件内容摘要，注入到提示词中
         String filesStr = FileUtil.formatFileInfo(context.getProductFiles(), true);
         setSystemPrompt(getSystemPromptSnapshot().replace("{{files}}", filesStr));
         setNextStepPrompt(getNextStepPromptSnapshot().replace("{{files}}", filesStr));
 
+        // 构造用户消息（如果不是用户消息）
         if (!getMemory().getLastMessage().getRole().equals(RoleType.USER)) {
             Message userMsg = Message.userMessage(getNextStepPrompt(), null);
             getMemory().addMessage(userMsg);
         }
         try {
-            // 获取带工具选项的响应
+            // 获取带工具选项的响应（可流式）
             context.setStreamMessageType("tool_thought");
 
+            // 调用LLM获取思考和工具调用
             CompletableFuture<LLM.ToolCallResponse> future = getLlm().askTool(
                     context,
                     getMemory().getMessages(),
                     Message.systemMessage(getSystemPrompt(), null),
                     availableTools,
-                    ToolChoice.AUTO, null, context.getIsStream(), 300
-            );
+                    ToolChoice.AUTO, null, context.getIsStream(), 300);
 
             LLM.ToolCallResponse response = future.get();
 
             setToolCalls(response.getToolCalls());
 
-            // 记录响应信息
+            // 记录响应信息（非流式场景下回传思考）
             if (!context.getIsStream() && response.getContent() != null && !response.getContent().isEmpty()) {
                 printer.send("tool_thought", response.getContent());
 
             }
 
             // 创建并添加助手消息
-            Message assistantMsg = response.getToolCalls() != null && !response.getToolCalls().isEmpty() && !"struct_parse".equals(llm.getFunctionCallType()) ?
-                    Message.fromToolCalls(response.getContent(), response.getToolCalls()) :
-                    Message.assistantMessage(response.getContent(), null);
+            Message assistantMsg = response.getToolCalls() != null && !response.getToolCalls().isEmpty()
+                    && !"struct_parse".equals(llm.getFunctionCallType())
+                            ? Message.fromToolCalls(response.getContent(), response.getToolCalls())
+                            : Message.assistantMessage(response.getContent(), null);
             getMemory().addMessage(assistantMsg);
 
         } catch (Exception e) {
@@ -125,18 +135,21 @@ public class ReactImplAgent extends ReActAgent {
 
     @Override
     public String act() {
-
+        // 如果没有工具调用，直接返回最后的消息内容
         if (toolCalls.isEmpty()) {
             setState(AgentState.FINISHED);
             return getMemory().getLastMessage().getContent();
         }
 
-        // action
+        // 执行所有工具调用
         Map<String, String> toolResults = executeTools(toolCalls);
         List<String> results = new ArrayList<>();
         for (ToolCall command : toolCalls) {
             String result = toolResults.get(command.getId());
-            if (!Arrays.asList("code_interpreter", "report_tool", "file_tool", "deep_search").contains(command.getFunction().getName())) {
+
+            // 发送工具执行结果（排除某些内部工具）
+            if (!Arrays.asList("code_interpreter", "report_tool", "file_tool", "deep_search")
+                    .contains(command.getFunction().getName())) {
                 String toolName = command.getFunction().getName();
                 printer.send("tool_result", AgentResponse.ToolResult.builder()
                         .toolName(toolName)
@@ -145,6 +158,7 @@ public class ReactImplAgent extends ReActAgent {
                         .build(), null);
             }
 
+            // 截取结果长度（如果设置了maxObserve）
             if (maxObserve != null) {
                 result = result.substring(0, Math.min(result.length(), maxObserve));
             }
@@ -157,8 +171,7 @@ public class ReactImplAgent extends ReActAgent {
                 Message toolMsg = Message.toolMessage(
                         result,
                         command.getId(),
-                        null
-                );
+                        null);
                 getMemory().addMessage(toolMsg);
             }
             results.add(result);

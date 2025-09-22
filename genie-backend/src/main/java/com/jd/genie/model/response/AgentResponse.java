@@ -12,40 +12,43 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Assistant返回
+ * 后端→前端 的统一SSE事件模型
+ * - messageType：事件类型（plan/task/tool/html/.../result）
+ * - resultMap/result：结构化/纯文本结果
+ * - plan/toolResult：结构化计划与工具结果
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class AgentResponse {
-    private String requestId;
-    private String messageId;
-    private Boolean isFinal;
-    private String messageType;
-    private String digitalEmployee;
-    private String messageTime;
-    private String planThought;
-    private Plan plan;
-    private String task;
-    private String taskSummary;
-    private String toolThought;
-    private ToolResult toolResult;
-    private Map<String, Object> resultMap;
-    private String result;
-    private Boolean finish;
-    private Map<String, String> ext;
+    private String requestId; // 请求ID
+    private String messageId; // 消息ID
+    private Boolean isFinal; // 是否最终消息（用于多路合成）
+    private String messageType; // 消息类型：plan/task/tool/html/.../result
+    private String digitalEmployee; // 数字员工（工具岗位名）
+    private String messageTime; // 发送时间戳（毫秒）
+    private String planThought; // 规划阶段的思考
+    private Plan plan; // 规划结构
+    private String task; // 当前任务标题
+    private String taskSummary; // 任务总结
+    private String toolThought; // 工具调用前的思考
+    private ToolResult toolResult; // 工具调用结果
+    private Map<String, Object> resultMap; // 结构化结果
+    private String result; // 文本结果
+    private Boolean finish; // 是否结束
+    private Map<String, String> ext; // 扩展字段
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Plan {
-        private String title;
-        private List<String> stages;
-        private List<String> steps;
-        private List<String> stepStatus;
-        private List<String> notes;
+        private String title; // 计划标题
+        private List<String> stages; // 阶段/大步骤
+        private List<String> steps; // 子任务（“执行顺序X. 标题：描述”或纯文本）
+        private List<String> stepStatus; // 子任务状态
+        private List<String> notes; // 备注
     }
 
     @Data
@@ -53,9 +56,9 @@ public class AgentResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ToolResult {
-        private String toolName;
-        private Map<String, Object> toolParam;
-        private String toolResult;
+        private String toolName; // 工具名
+        private Map<String, Object> toolParam;// 工具入参（结构化）
+        private String toolResult; // 工具结果（文本/JSON）
     }
 
     public static Plan formatSteps(Plan plan) {

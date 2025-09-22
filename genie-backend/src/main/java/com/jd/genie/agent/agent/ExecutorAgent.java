@@ -1,6 +1,7 @@
 package com.jd.genie.agent.agent;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.jd.genie.agent.dto.Message;
 import com.jd.genie.agent.dto.tool.ToolCall;
 import com.jd.genie.agent.dto.tool.ToolChoice;
@@ -22,7 +23,11 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 工具调用代理 - 处理工具/函数调用的基础代理类
+ * 执行代理（Executor）
+ * - 基于工具函数调用完成具体子任务
+ * - 从 Prompt 中注入工具清单与上下文文件摘要
+ * - think(): 让模型选择工具与构造调用参数
+ * - act(): 执行工具、写入记忆并回传结果
  */
 @Data
 @Slf4j
@@ -73,7 +78,7 @@ public class ExecutorAgent extends ReActAgent {
         setContext(context);
         setMaxObserve(Integer.parseInt(genieConfig.getMaxObserve()));
 
-        // 初始化工具集合
+        // 初始化工具集合：沿用上下文构建时注入的工具
         availableTools = context.getToolCollection();
         setDigitalEmployeePrompt(genieConfig.getDigitalEmployeePrompt());
 
@@ -82,7 +87,7 @@ public class ExecutorAgent extends ReActAgent {
 
     @Override
     public boolean think() {
-        // 获取文件内容
+        // 获取文件内容摘要，注入到提示词中
         String filesStr = FileUtil.formatFileInfo(context.getProductFiles(), true);
         setSystemPrompt(getSystemPromptSnapshot().replace("{{files}}", filesStr));
         setNextStepPrompt(getNextStepPromptSnapshot().replace("{{files}}", filesStr));
@@ -93,8 +98,8 @@ public class ExecutorAgent extends ReActAgent {
         }
 
         try {
-            // 获取带工具选项的响应
-            log.info("{} executor ask tool {}", context.getRequestId(), JSON.toJSONString(availableTools));
+            // 获取带工具选项的响应（function call/structured output）
+            log.info("{} executor ask tool {}", context.getRequestId(), JSON.toJSONString(availableTools, SerializerFeature.PrettyFormat));
             CompletableFuture<LLM.ToolCallResponse> future = getLlm().askTool(
                     context,
                     getMemory().getMessages(),
@@ -106,7 +111,7 @@ public class ExecutorAgent extends ReActAgent {
             LLM.ToolCallResponse response = future.get();
             setToolCalls(response.getToolCalls());
 
-            // 记录响应信息
+            // 记录响应信息（若没有工具调用，则认为是阶段性总结）
             if (response.getContent() != null && !response.getContent().trim().isEmpty()) {
                 String thinkResult = response.getContent();
                 String subType = "taskThought";
@@ -123,7 +128,7 @@ public class ExecutorAgent extends ReActAgent {
 
             }
 
-            // 创建并添加助手消息
+            // 创建并添加助手消息（携带工具调用或纯文本）
             Message assistantMsg = response.getToolCalls() != null && !response.getToolCalls().isEmpty() && !"struct_parse".equals(llm.getFunctionCallType()) ?
                     Message.fromToolCalls(response.getContent(), response.getToolCalls()) :
                     Message.assistantMessage(response.getContent(), null);
@@ -145,7 +150,7 @@ public class ExecutorAgent extends ReActAgent {
         if (toolCalls.isEmpty()) {
             GenieConfig genieConfig = SpringContextHolder.getApplicationContext().getBean(GenieConfig.class);
             setState(AgentState.FINISHED);
-            // 删除工具结果
+            // 删除工具结果（可配置清理，避免上下文膨胀）
             if ("1".equals(genieConfig.getClearToolMessage())) {
                 getMemory().clearToolContext();
             }
@@ -156,7 +161,7 @@ public class ExecutorAgent extends ReActAgent {
             return getMemory().getLastMessage().getContent();
         }
 
-        Map<String, String> toolResults = executeTools(toolCalls);
+        Map<String, String> toolResults = executeTools(toolCalls); // 逐个执行工具
         List<String> results = new ArrayList<>();
         for (ToolCall command : toolCalls) {
             String result = toolResults.get(command.getId());
@@ -193,6 +198,9 @@ public class ExecutorAgent extends ReActAgent {
     public String run(String request) {
         generateDigitalEmployee(request);
         GenieConfig genieConfig = SpringContextHolder.getApplicationContext().getBean(GenieConfig.class);
+        // 先输出100字以内的文字内容确定下一步的行动（其中文字内容不要重复之前的思考内容，不能透露代码、链接等。
+        // 严禁使用Markdown格式输出）。然后必须输出工具 工具调用来完成当前任务。
+        // + request
         request = genieConfig.getTaskPrePrompt() + request;
         // 更新当前task
         context.setTask(request);

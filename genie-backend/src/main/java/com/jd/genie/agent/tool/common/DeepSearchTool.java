@@ -2,6 +2,7 @@ package com.jd.genie.agent.tool.common;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.jd.genie.agent.agent.AgentContext;
 import com.jd.genie.agent.dto.DeepSearchRequest;
 import com.jd.genie.agent.dto.DeepSearchrResponse;
@@ -121,7 +122,7 @@ public class DeepSearchTool implements BaseTool {
                     JSONObject.toJSONString(searchRequest)
             );
 
-            log.info("{} deep_search request {}", agentContext.getRequestId(), JSONObject.toJSONString(searchRequest));
+            log.info("{} deep_search request {}", agentContext.getRequestId(), JSONObject.toJSONString(searchRequest, SerializerFeature.PrettyFormat));
             Request.Builder requestBuilder = new Request.Builder()
                     .url(url)
                     .post(body);

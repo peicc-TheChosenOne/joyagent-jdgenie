@@ -1,6 +1,7 @@
 package com.jd.genie.agent.tool.common;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.jd.genie.agent.agent.AgentContext;
 import com.jd.genie.agent.dto.CodeInterpreterResponse;
 import com.jd.genie.agent.dto.File;
@@ -124,7 +125,7 @@ public class FileTool implements BaseTool {
                 .addHeader("Content-Type", "application/json")
                 .build();
         try {
-            log.info("{} file tool upload request {}", agentContext.getRequestId(), JSON.toJSONString(fileRequest));
+            log.info("{} file tool upload request {}", agentContext.getRequestId(), JSON.toJSONString(fileRequest, SerializerFeature.PrettyFormat));
             Response response = client.newCall(request).execute();
             if (!response.isSuccessful() || response.body() == null) {
                 log.error("{} upload file faied", agentContext.getRequestId());
@@ -203,7 +204,7 @@ public class FileTool implements BaseTool {
                 .addHeader("Content-Type", "application/json")
                 .build();
         try {
-            log.info("{} file tool get request {}", agentContext.getRequestId(), JSON.toJSONString(getFileRequest));
+            log.info("{} file tool get request {}", agentContext.getRequestId(), JSON.toJSONString(getFileRequest, SerializerFeature.PrettyFormat));
             Response response = client.newCall(request).execute();
             if (!response.isSuccessful() || response.body() == null) {
                 String errMessage = "获取文件失败 " + fileRequest.getFileName();

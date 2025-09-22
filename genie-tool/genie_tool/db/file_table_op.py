@@ -15,25 +15,41 @@ class _FileDB(object):
         if not os.path.exists(self._work_dir):
             os.makedirs(self._work_dir)
 
-    async def save(self, file_name, content, scope) -> str:
-        if "." in file_name:
-            file_name = os.path.basename(file_name)
-        else:
-            file_name = f"{file_name}.txt"
+    def _sanitize_path_component(self, name: str) -> str:
+        name = str(name or "_")
+        # 替换非法字符
+        name = name.translate({ord(ch): '_' for ch in '<>:"/\\|?*'})
+        name = name.replace("\n", "_").replace("\r", "_").replace("\t", "_")
+        if os.name == 'nt':
+            name = name.rstrip(' .')
+            reserved = {
+                'CON','PRN','AUX','NUL',
+                'COM1','COM2','COM3','COM4','COM5','COM6','COM7','COM8','COM9',
+                'LPT1','LPT2','LPT3','LPT4','LPT5','LPT6','LPT7','LPT8','LPT9'
+            }
+            if name.upper() in reserved:
+                name = f"_{name}"
+        return (name or "_")[:255]
 
-        save_path = os.path.join(self._work_dir, scope)
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        with open(f"{save_path}/{file_name}", "w") as f:
+    async def save(self, file_name, content, scope) -> str:
+        base_name = os.path.basename(file_name)
+        if "." not in base_name:
+            base_name = f"{base_name}.txt"
+        file_name = self._sanitize_path_component(base_name)
+        scope_dir = self._sanitize_path_component(scope or "default")
+
+        save_path = os.path.join(self._work_dir, scope_dir)
+        os.makedirs(save_path, exist_ok=True)
+        with open(f"{save_path}/{file_name}", "w", encoding="utf-8") as f:
             f.write(content)
         return f"{save_path}/{file_name}"
     
     async def save_by_data(self, file: UploadFile) -> str:
-        file_name = file.filename
+        file_name = self._sanitize_path_component(os.path.basename(file.filename))
         file_data = file.file.read()
         save_path = os.path.join(self._work_dir, file_name)
         with open(save_path, "wb") as f:
-             f.write(file_data)
+            f.write(file_data)
         return save_path
 
 

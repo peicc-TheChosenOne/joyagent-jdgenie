@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @EqualsAndHashCode(callSuper = true)
 public class SummaryAgent extends BaseAgent {
+    // 任务执行过程总结与最终交付物提取
     private String requestId;
     private Integer messageSizeLimit;
     public static final String logFlag = "summaryTaskResult";
@@ -45,7 +46,7 @@ public class SummaryAgent extends BaseAgent {
         return "";
     }
 
-    // 构造文件信息
+    // 构造文件信息：生成 文件名:描述 列表（过滤内部文件）
     private String createFileInfo() {
         List<File> files = context.getProductFiles();
         if (CollectionUtils.isEmpty(files)) {
@@ -62,7 +63,7 @@ public class SummaryAgent extends BaseAgent {
         return result;
     }
 
-    // 提取系统提示格式化逻辑
+    // 构造用于总结的系统提示内容（注入任务历史、文件列表与原始问题）
     private String formatSystemPrompt(String taskHistory, String query) {
         String systemPrompt = getSystemPrompt();
         if (systemPrompt == null) {
@@ -77,19 +78,21 @@ public class SummaryAgent extends BaseAgent {
                 .replace("{{query}}", query);
     }
 
-    // 提取消息创建逻辑
+    // 构造用户消息（此处简化为 userMessage，便于统一 ask 接口）
     private Message createSystemMessage(String content) {
         return Message.userMessage(content, null); // 如果需要更复杂的消息构建，可扩展
     }
 
     /**
-     * 解析LLM响应并处理文件关联
+     * 解析LLM响应：按 $$$ 切分为 概要 + 文件名列表，并与上下文文件匹配
      */
     private TaskSummaryResult parseLlmResponse(String llmResponse) {
         if (StringUtils.isEmpty(llmResponse)) {
             log.error("requestId: {} pattern matcher failed for response is null", requestId);
         }
 
+        // 已经成功收集并整理了OpenAI官方所有模型的列表和详细定价信息，包括GPT系列、DALL-E系列、Whisper系列和文本嵌入模型，
+        // 并生成了完整的综合分析报告，所有数据基于2025年最新信息。详情可查看报告文件。$$$OpenAI官方模型及价格分析报告2025年.html
         String[] parts1 = llmResponse.split("\\$\\$\\$");
         if (parts1.length < 2) {
             return TaskSummaryResult.builder().taskSummary(parts1[0]).build();

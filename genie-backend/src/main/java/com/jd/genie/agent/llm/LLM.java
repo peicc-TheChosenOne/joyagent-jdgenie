@@ -3,6 +3,7 @@ package com.jd.genie.agent.llm;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -163,7 +164,7 @@ public class LLM {
         if (messages.isEmpty() || maxInputTokens < 0) {
             return messages;
         }
-        log.info("{} before truncate {}", context.getRequestId(), JSON.toJSONString(messages));
+        log.info("{} before truncate {}", context.getRequestId(), JSON.toJSONString(messages, SerializerFeature.PrettyFormat));
         List<Map<String, Object>> truncatedMessages = new ArrayList<>();
         int remainingTokens = maxInputTokens;
         Map<String, Object> system = messages.get(0);
@@ -195,7 +196,7 @@ public class LLM {
         if ("system".equals(system.getOrDefault("role", ""))) {
             truncatedMessages.add(0, system);
         }
-        log.info("{} after truncate {}", context.getRequestId(), JSON.toJSONString(truncatedMessages));
+        log.info("{} after truncate {}", context.getRequestId(), JSON.toJSONString(truncatedMessages, SerializerFeature.PrettyFormat));
 
         return truncatedMessages;
     }
@@ -452,7 +453,16 @@ public class LLM {
             params.put("messages", formattedMessages);
 
             if (!"struct_parse".equals(functionCallType)) {
+                // Deepseek
+                // 模型可能会调用的 tool 的列表。目前，仅支持 function 作为工具。
+                // 使用此参数来提供以 JSON 作为输入参数的 function 列表。最多支持 128 个 function。
                 params.put("tools", formattedTools);
+                // 控制模型调用 tool 的行为。
+                // none 意味着模型不会调用任何 tool，而是生成一条消息。
+                // auto 意味着模型可以选择生成一条消息或调用一个或多个 tool。
+                // required 意味着模型必须调用一个或多个 tool。
+                // 通过 {"type": "function", "function": {"name": "my_function"}} 指定特定 tool，会强制模型调用该 tool。
+                // 当没有 tool 时，默认值为 none。如果有 tool 存在，默认值为 auto。
                 params.put("tool_choice", toolChoice.getValue());
             }
 
@@ -776,7 +786,7 @@ public class LLM {
                             }
                         }
 
-                        log.info("{} call llm stream response {} {}", context.getRequestId(), stringBuilderAll, JSON.toJSONString(toolCalls));
+                        log.info("{} call llm stream response {} {}", context.getRequestId(), stringBuilderAll, JSON.toJSONString(toolCalls, SerializerFeature.PrettyFormat));
 
                         ToolCallResponse fullResponse = ToolCallResponse.builder()
                                 .toolCalls(toolCalls)

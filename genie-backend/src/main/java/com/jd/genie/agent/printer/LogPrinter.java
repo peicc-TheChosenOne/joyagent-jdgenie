@@ -1,6 +1,7 @@
 package com.jd.genie.agent.printer;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.jd.genie.agent.enums.AgentType;
 import com.jd.genie.model.req.AgentRequest;
 import lombok.extern.slf4j.Slf4j;
